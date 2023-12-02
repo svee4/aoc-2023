@@ -3,58 +3,67 @@ namespace Day2;
 
 class Part2
 {
-	public static void Solve()
+	public static long Solve(ReadOnlySpan<char> input)
 	{
-
-		const string MOCK_INPUT = @"Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
-Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
-Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
-Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
-Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
-
-		const string INPUT_FILE_PATH = "/home/alex/code/aoc/23/day2/input1.txt";
 
 		long accumulator = 0;
 
-		string[] input = File.ReadAllLines(INPUT_FILE_PATH);
-		// string[] input = MOCK_INPUT.Split(Environment.NewLine);
-
-		foreach (string line in input)
+		int index = 0;
+		while (true)
 		{
+			// skip game id
+			index += 5; //"Game ".Length
+			while (input[index++] != ':') { }
+			index++;
 
-			var sets = line
-				.Split(':')[1]
-				.Split(';')
-				.Log(s => $"set: {s}")
-				.Select(set =>
-					set.Split(',')
-						.Select(pull => pull.Trim().Split(' '))
-						.Log(arr => string.Join(" | ", arr))
-						.Select(arr => new { color = arr[1], count = int.Parse(arr[0]) })
-			);
+			// get max values for all colors
+			int red = 0, green = 0, blue = 0, current;
 
-			Dictionary<string, int> maxValuePerColor = new()
+		READ_COLOR:
+			current = 0;
+
+			while (input[index] != ' ')
 			{
-				["red"] = 0,
-				["green"] = 0,
-				["blue"] = 0
-			};
-
-			foreach (var set in sets)
-			{
-
-				foreach (var pull in set)
-				{
-					if (maxValuePerColor[pull.color] < pull.count)
-					{
-						maxValuePerColor[pull.color] = pull.count;
-					}
-				}
+				current = (10 * current) + (input[index] - '0');
+				index++;
 			}
 
-			accumulator += maxValuePerColor.Aggregate(1, (cum, cur) => cum * cur.Value);
+			index++;
+
+			switch (input[index])
+			{
+				case 'r':
+					{
+						if (current > red) red = current;
+						index += 3; //"ed".Length + 1;
+						; break;
+					}
+				case 'g':
+					{
+						if (current > green) green = current;
+						index += 5; //"reen".Length + 1;
+						break;
+					}
+				case 'b':
+					{
+						if (current > blue) blue = current;
+						index += 4; //"lue".Length + 1;
+						break;
+					}
+			}
+
+			if (input[index] == ',' || input[index] == ';')
+			{
+				index += 2;
+				goto READ_COLOR;
+			}
+
+			accumulator += red * green * blue;
+
+			while (input[index++] != '\n') { }
+			if (index >= input.Length) break;
 		}
 
-		Console.WriteLine(accumulator);
+		return accumulator;
 	}
 }
