@@ -7,14 +7,21 @@ class Part2
 	{
 
 		long accumulator = 0;
-
+		int gameIdLength = 1;
+		int iteration = 0;
 		int index = 0;
 		while (true)
 		{
+			iteration++;
+			if (iteration == 10) gameIdLength = 2;
+			else if (iteration == 100) gameIdLength = 3;
+
 			// skip game id
-			index += 5; //"Game ".Length
-			while (input[index++] != ':') { }
-			index++;
+			// format: "Game xx: "
+			// 5 == "Game ".Length
+			// gameId == the game id length in chars
+			// 2 == ": ".Length
+			index += 5 + gameIdLength + 2;
 
 			// get max values for all colors
 			int red = 0, green = 0, blue = 0, current;
