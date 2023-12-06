@@ -19,7 +19,7 @@ BenchmarkDotNet.Running.BenchmarkRunner.Run<Benchmark>();
 [MemoryDiagnoser]
 [RankColumn]
 [Orderer(BenchmarkDotNet.Order.SummaryOrderPolicy.FastestToSlowest)]
-class Benchmark
+public class Benchmark
 {
 	[GlobalSetup]
 	public void GlobalSetup() { AssertResults(); }
