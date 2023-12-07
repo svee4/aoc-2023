@@ -1,4 +1,4 @@
 # Advent of Code 2023
 
-#### Most implementations are performance-focused
+#### Some implementations are performance-focused, some not
 #### All implementations are just for fun
