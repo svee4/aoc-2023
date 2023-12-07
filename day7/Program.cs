@@ -1,7 +1,6 @@
-#define PART2
 
-using System.Diagnostics;
 using BenchmarkDotNet.Attributes;
+using static Helpers;
 
 
 #if DEBUG
@@ -16,6 +15,8 @@ BenchmarkDotNet.Running.BenchmarkRunner.Run<Benchmark>();
 [Orderer(BenchmarkDotNet.Order.SummaryOrderPolicy.FastestToSlowest)]
 public class Benchmark
 {
+
+	public static bool IsPart2 { get; private set; } = false;
 
 	string Input = null!;
 
@@ -35,64 +36,65 @@ QQQJA 483
 	public void AssertResults()
 	{
 		Part1Solution1();
+		Part2Solution1();
 	}
+
+
+	public static readonly char[] Part1Labels = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
+	public static readonly char[] Part2Labels = ['J', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'Q', 'K', 'A'];
 
 
 	[Benchmark]
 	public void Part1Solution1()
 	{
-		string input = Input;
-		List<Hand> hands = [];
-		foreach (string line in Input.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
-		{
-			string cards = line[..5].Trim();
-			string bidstr = line[6..].Trim();
-			int bid = int.Parse(bidstr);
-			Hand hand = Hand.FromString(cards, bid);
-			hands.Add(hand);
-		}
+		IsPart2 = false;
+		if (Solve() != 251216224) throw new Exception();
+		// Solve();
+		// Console.WriteLine(Solve());
+	}
 
-		var ordered = hands.OrderBy(hand => hand);
+	[Benchmark]
+	public void Part2Solution1()
+	{
+		IsPart2 = true;
+		if (Solve() != 250825971) throw new Exception();
+		// Solve();
+		// Console.WriteLine(Solve());
+	}
+
+	long Solve()
+	{
+		string input = Input;
+		var hands = Input
+					.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+					.Select(Hand.FromString)
+					.OrderBy(Self, new Hand.Comparer());
 
 		long accumulator = 0;
 		int rank = 1;
-		foreach (var hand in ordered)
+		foreach (Hand hand in hands)
 		{
-			if (hand.Cards.Any(card => card == Card.J)) Console.WriteLine($"{rank,4}: {hand}");
+			// Console.WriteLine($"{rank,4}: {hand}");
 			accumulator += rank * hand.Bid;
 			rank++;
 		}
 
-		Console.WriteLine(accumulator);
+		return accumulator;
 	}
 
-	[Benchmark]
-	public void Part2Solution1() { }
-
 }
 
-enum Card
+
+record struct Card(char Label) : IComparable<Card>
 {
-	Unknown = 0,
-#if PART2
-	J, // PART 2
-#endif
-	Two,
-	Three,
-	Four,
-	Five,
-	Six,
-	Seven,
-	Eight,
-	Nine,
-	T,
-#if !PART2
-	J, // PART 1
-#endif
-	Q,
-	K,
-	A
+	public readonly int CompareTo(Card other) =>
+		CompareCards(this, other, Benchmark.IsPart2 ? Benchmark.Part2Labels : Benchmark.Part1Labels, false);
+
+	public readonly bool IsJoker() => Label == 'J';
+	public override readonly string ToString() => Label.ToString();
 }
+
+
 
 
 enum Strength
@@ -107,222 +109,138 @@ enum Strength
 }
 
 
-class Hand(Card first, Card second, Card third, Card fourth, Card fifth, int bid) : IComparable<Hand>
+record Hand(Card First, Card Second, Card Third, Card Fourth, Card Fifth, int Bid)
 {
 
-	public Card First { get; } = first;
-	public Card Second { get; } = second;
-	public Card Third { get; } = third;
-	public Card Fourth { get; } = fourth;
-	public Card Fifth { get; } = fifth;
-	public int Bid { get; } = bid;
 
-	public Card[] Cards { get; } = [first, second, third, fourth, fifth];
+	public Card[] Cards { get; } = [First, Second, Third, Fourth, Fifth];
 
 
-	public Strength GetStrength()
+	public Strength GetStrength(bool useJoker)
 	{
+		Card[] cards = [.. Cards];
 
-#if PART2
-		Card firstThatsNotJoker = Cards.FirstOrDefault(card => card != Card.J);
-		if (firstThatsNotJoker == Card.Unknown) return Strength.FiveKind; // five jokers
-		if (Cards.All(c => Helpers.CompareCard(firstThatsNotJoker, c))) return Strength.FiveKind;
-#else
-		if (Cards.Skip(1).All(c => Helpers.CompareCard(First, c))) return Strength.FiveKind;
-#endif
-
-
-		// get unique labels
-		List<Card> labels = [];
-
-		bool hasJoker = Cards.Any(card => card == Card.J);
-		// Card firstThatsNotJ = Cards.FirstOrDefault(card => card != Card.J);
-		// if (firstThatsNotJ == Card.Unknown) return Strength.FiveKind; // all jokers
-
-		foreach (Card card in Cards)
-			if (!labels.Any(label => card == label)) labels.Add(card);
-
-		// if (hasJoker) labels.Add(Card.J);
-
-		int totalDiffererentLabels = labels.Count;
-
-		if (totalDiffererentLabels == 2)
+		if (useJoker && cards.Any(c => c.IsJoker()) && cards.Any(c => !c.IsJoker()))
 		{
-			// labelCounts include joker matches
-			int firstLabelCount = Cards.Where(card => Helpers.CompareCard(card, labels[0])).Count();
-			int secondLabelCount = Cards.Where(card => Helpers.CompareCard(card, labels[1])).Count();
-
-			// any variation of AAAAJ - AJJJJ, this should already be matched by the first check
-			// if (firstLabelCount == 5 && secondLabelCount == 5)
-			// 	return Strength.FiveKind;
-
-			// these will never match because totalDifferentLabels includes joker
-			// one joker - AABBJ
-			// if (firstLabelCount == 3 && secondLabelCount == 3)
-			// 	return Strength.FullHouse;
-
-			// // one joker - AAABJ
-			// if (firstLabelCount == 4 && secondLabelCount == 2 || firstLabelCount == 2 && secondLabelCount == 4)
-			// 	return Strength.FourKind;
-
-			// // two jokers - AABJJ
-			// if (firstLabelCount == 4 && secondLabelCount == 3 || firstLabelCount == 3 && secondLabelCount == 4)
-			// 	return Strength.FourKind;
-
-			// // three jokers - ABJJJ
-			// if (firstLabelCount == 4 && secondLabelCount == 4)
-			// 	return Strength.FourKind;
-
-			// no jokers - AAAAB
-			if (firstLabelCount == 1 || secondLabelCount == 1)
-				return Strength.FourKind;
-
-			// no jokers - AAABB
-			if (firstLabelCount == 3 && secondLabelCount == 2 || firstLabelCount == 2 && secondLabelCount == 3)
-				return Strength.FullHouse;
-
-			throw new UnreachableException();
+			// get most common card and replace joker with it
+			Card mostCommon = cards.Where(card => !card.IsJoker()).GroupBy(c => c).MaxBy(g => g.Count())!.Key;
+			for (int i = 0; i < cards.Length; i++)
+				if (cards[i].IsJoker()) cards[i] = mostCommon;
 		}
 
-		if (totalDiffererentLabels == 3)
+		// cards = [.. cards.OrderBy(card => Benchmark.Part1Labels.IndexOf(card.Label))];
+		// cards are ordered by occurrence count
+		cards = [.. cards.GroupBy(Self).OrderByDescending(g => g.Count()).SelectMany(g => g.AsEnumerable())];
+		int distincts = cards.Distinct().Count();
+
+		if (distincts == 1) return Strength.FiveKind;
+		if (distincts == 2)
 		{
-			// AABBC
+			return cards.Where(c => c == cards[0]).Count() == 4 ? Strength.FourKind : Strength.FullHouse;
+			// Card first = cards[0];
+			// Card second = cards.First(c => c != first);
+			// int count = cards.Where(c => c == first).Count();
+			// if (count == 4 || count == 1) return Strength.FourKind;
+			// return Strength.FullHouse;
+		}
+
+		if (distincts == 3)
+		{
 			// AAABC
-			// AABBJ
-			// AAABJ
-			// AABJJ
+			// AABBC
 
-			if (labels.Any(label => Cards.Where(card => Helpers.CompareCard(card, label)).Count() == 4))
-			{
-				// AAABJ
-				// AABJJ
-				return Strength.FourKind;
-			}
+			return cards.GroupBy(Self).Select(g => g.Count()).Any(count => count == 3) ? Strength.ThreeKind : Strength.TwoPair;
 
-			if (labels.Any(label => Cards.Where(card => Helpers.CompareCard(card, label)).Count() == 3))
-			{
-				// AABBJ
-				// AAABC
-				return Strength.ThreeKind;
-			}
+			// Dictionary<Card, int> counts = cards.Distinct().ToDictionary(c => c, _ => 0);
+			// foreach (Card c in cards)
+			// 	counts[c]++;
 
-			return Strength.TwoPair;
+			// return counts.Any(kvp => kvp.Value == 3) ? Strength.ThreeKind : Strength.TwoPair;
 		}
 
-		if (totalDiffererentLabels == 4)
+		if (distincts == 4)
 		{
 			// AABCD
-			// AABCJ
-			if (hasJoker) return Strength.ThreeKind;
 			return Strength.OnePair;
 		}
 
-		// 5 different labels
-		// ABCDJ
-		if (hasJoker) return Strength.OnePair;
-		// ABCDE
 		return Strength.High;
 	}
 
 
-	public static Hand FromString(string cardString, int bid)
-	{
-		if (cardString.Length != 5) throw new ArgumentException("argument length property must be 5", nameof(cardString));
-
-		Span<Card> cards = stackalloc Card[5];
-		for (int i = 0; i < 5; i++)
-		{
-			cards[i] = cardString[i] switch
-			{
-				'2' => Card.Two,
-				'3' => Card.Three,
-				'4' => Card.Four,
-				'5' => Card.Five,
-				'6' => Card.Six,
-				'7' => Card.Seven,
-				'8' => Card.Eight,
-				'9' => Card.Nine,
-				'T' => Card.T,
-				'J' => Card.J,
-				'Q' => Card.Q,
-				'K' => Card.K,
-				'A' => Card.A,
-				_ => throw new InvalidOperationException("cardstring was invalid")
-			};
-		}
-
-		return new Hand(
-			cards[0],
-			cards[1],
-			cards[2],
-			cards[3],
-			cards[4],
-			bid
-		);
-	}
+	public static Hand FromString(string fullstring) =>
+		fullstring[..5].With(labels => new Hand(
+			new(labels[0]),
+			new(labels[1]),
+			new(labels[2]),
+			new(labels[3]),
+			new(labels[4]),
+			int.Parse(fullstring[6..])
+		));
 
 
 	public override string ToString()
 	{
-		var s = Helpers.CardToString;
+
+		var ss = Cards.OrderByDescending(c => c);
 		return
-			$"{string.Join(string.Empty, Cards.Select(s))} " +
-			$"(Cards: {string.Join(string.Empty, Cards.OrderByDescending(c => c).Select(s))}, Strength: {GetStrength()}, Bid: {Bid,4})";
+			$"{string.Join(string.Empty, Cards)} " +
+			$"(Cards: {string.Join(string.Empty, ss)}, Strength: {GetStrength(Benchmark.IsPart2)}, Bid: {Bid,4})";
+
 	}
 
-	public int CompareTo(Hand? other)
+
+	public int CompareTo(Hand other, bool useJoker)
 	{
-		ArgumentNullException.ThrowIfNull(other);
-
-		Strength myStrength = GetStrength();
-		Strength otherStrength = other.GetStrength();
-
-		int result = myStrength.CompareTo(otherStrength);
+		int result = GetStrength(useJoker).CompareTo(other.GetStrength(useJoker));
 		if (result != 0) return result;
 
-		ReadOnlySpan<(Card, Card)> compareCards = [
-			(First, other.First),
-				(Second, other.Second),
-				(Third, other.Third),
-				(Fourth, other.Fourth),
-				(Fifth, other.Fifth)
-		];
-
-		foreach ((Card myCard, Card compareCard) in compareCards)
+		foreach ((Card myCard, Card compareCard) in Cards.Zip(other.Cards))
 		{
-			if (myCard > compareCard) return 1;
-			else if (myCard < compareCard) return -1;
+			int result2 = CompareCards(myCard, compareCard, useJoker ? Benchmark.Part2Labels : Benchmark.Part1Labels, useJoker: false);
+			if (result2 != 0) return result2;
 		}
 
 		return 0;
+	}
+
+
+	public class Comparer : IComparer<Hand>
+	{
+		int IComparer<Hand>.Compare(Hand? x, Hand? y)
+		{
+			ArgumentNullException.ThrowIfNull(x);
+			ArgumentNullException.ThrowIfNull(y);
+			return x.CompareTo(y, Benchmark.IsPart2);
+		}
 	}
 }
 
 static class Helpers
 {
 
-	public static char CardToString(Card card) => card switch
-	{
-		Card.Two => '2',
-		Card.Three => '3',
-		Card.Four => '4',
-		Card.Five => '5',
-		Card.Six => '6',
-		Card.Seven => '7',
-		Card.Eight => '8',
-		Card.Nine => '9',
-		_ => card.ToString()[0]
-	};
+	public static bool CardsAreEqual(Card first, Card second, bool useJoker) =>
+		!useJoker
+			? first == second
+			: first == second || first.IsJoker() || second.IsJoker();
 
 
-	public static bool CompareCard(Card first, Card second)
+	public static int CompareCards(Card first, Card second, char[] order, bool useJoker) =>
+		CardsAreEqual(first, second, useJoker)
+			? 0
+			: order.IndexOf(first.Label).CompareTo(order.IndexOf(second.Label));
+
+
+	public static int IndexOf<T>(this T[] @this, T value) where T : IComparable<T>
 	{
-		// compare cards while taking into account part 2's joker card that can be equal to any card
-#if PART1
-		return first == second;
-#else
-		return first == second || first == Card.J || second == Card.J;
-#endif
+		for (int i = 0; i < @this.Length; i++)
+			if (@this[i].CompareTo(value) == 0) return i;
+		return -1;
 	}
 
+	public static T Self<T>(T self) => self;
+
+	public static E With<T, E>(this T @this, Func<T, E> func) => func(@this);
 }
+
+class ShouldBeUnreachableException : Exception { }
