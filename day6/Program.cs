@@ -201,17 +201,15 @@ public class Benchmark
 	public int Part2Threads1000() => RunThreaded(1000);
 
 
-	static int RunThreaded(int threadCount)
+	int RunThreaded(int threadCount)
 	{
-		const int Time = 44899691;
-		const long Distance = 277113618901768;
 		int accumulator = 0;
 
 		Thread[] threads = new Thread[threadCount];
 		Chunk[] chunks = new Chunk[threadCount];
-		int rangeSize = Time / threadCount;
+		int rangeSize = (int)(Time / threadCount);
 
-		chunks[threadCount - 1] = new(Time - rangeSize, Time);
+		chunks[threadCount - 1] = new((int)(Time - rangeSize), (int)Time);
 		for (int i = threadCount - 2; i >= 0; i--)
 		{
 			chunks[i] = new(i * rangeSize, chunks[i + 1].Start - 1);
